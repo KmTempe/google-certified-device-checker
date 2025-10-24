@@ -199,6 +199,30 @@ function App() {
           <p className="hint">No results yet. Enter a filter above to start.</p>
         )}
       </section>
+
+      <footer className="site-footer">
+        <span>
+          View the code on {" "}
+          <a
+            href="https://github.com/KmTempe/google-certified-device-checker"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>
+        </span>
+        <span>
+          Need help? Use the {" "}
+          <a
+            href="https://contact.ausrine.giize.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            contact form
+          </a>
+          .
+        </span>
+      </footer>
     </div>
   );
 }
