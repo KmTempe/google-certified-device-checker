@@ -1,5 +1,6 @@
 name: Refresh Dataset
 
+# This workflow refreshes the Google Play certified devices dataset on a schedule.
 on:
   schedule:
     - cron: "0 8 * * *"
