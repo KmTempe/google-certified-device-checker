@@ -24,9 +24,11 @@ frontend/dist/
 frontend/.vite/
 frontend/.turbo/
 frontend/.env.local
+frontend/.env.prod
 
 .env
 .env.local
+.env.prod
 
 # OS artifacts
 .DS_Store
