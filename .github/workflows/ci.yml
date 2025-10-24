@@ -26,6 +26,8 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run backend tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: pytest
 
   frontend:
