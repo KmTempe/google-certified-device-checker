@@ -30,6 +30,8 @@ class DeviceRecord(BaseModel):
 class DeviceLookupResponse(BaseModel):
     total_matches: int
     limit: int
+    page: int
+    total_pages: int
     results: list[DeviceRecord]
 
 
@@ -79,9 +81,12 @@ def _filter_devices(
     device: Optional[str],
     model: Optional[str],
     limit: int,
+    page: int,
 ) -> DeviceLookupResponse:
     if limit <= 0:
         raise HTTPException(status_code=400, detail="limit must be a positive integer")
+    if page <= 0:
+        raise HTTPException(status_code=400, detail="page must be a positive integer")
 
     df = _load_dataset()
     mask = pd.Series(True, index=df.index)
@@ -99,7 +104,16 @@ def _filter_devices(
 
     filtered = df[mask]
     total_matches = int(filtered.shape[0])
-    limited = filtered.head(limit)
+    if total_matches == 0:
+        total_pages = 0
+    else:
+        total_pages = int(-(-total_matches // limit))
+
+    offset = (page - 1) * limit
+    if offset >= total_matches:
+        limited = filtered.iloc[0:0]
+    else:
+        limited = filtered.iloc[offset : offset + limit]
 
     results = [
         DeviceRecord(
@@ -111,7 +125,13 @@ def _filter_devices(
         for row in limited.itertuples()
     ]
 
-    return DeviceLookupResponse(total_matches=total_matches, limit=limit, results=results)
+    return DeviceLookupResponse(
+        total_matches=total_matches,
+        limit=limit,
+        page=page,
+        total_pages=total_pages,
+        results=results,
+    )
 
 
 @asynccontextmanager
@@ -165,6 +185,11 @@ async def check_device(
         le=500,
         description="Maximum number of matching records to include in the response.",
     ),
+    page: int = Query(
+        1,
+        ge=1,
+        description="Page number to return (1-indexed).",
+    ),
 ) -> DeviceLookupResponse:
     if not any([brand, marketing_name, device, model]):
         raise HTTPException(
@@ -178,4 +203,5 @@ async def check_device(
         device=device,
         model=model,
         limit=limit,
+        page=page,
     )

@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
-import { lookupDevices, type DeviceLookupResponse } from "./api";
+import {
+  DEFAULT_LIMIT,
+  lookupDevices,
+  type DeviceLookupResponse,
+} from "./api";
 
 interface FormState {
   brand: string;
   marketingName: string;
   device: string;
   model: string;
-  limit: number;
+  limit: string;
 }
 
 const initialFormState: FormState = {
@@ -14,7 +18,7 @@ const initialFormState: FormState = {
   marketingName: "",
   device: "",
   model: "",
-  limit: 25,
+  limit: String(DEFAULT_LIMIT),
 };
 
 function App() {
@@ -22,6 +26,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<DeviceLookupResponse | null>(null);
+  const [page, setPage] = useState(1);
 
   const canSubmit = useMemo(() => {
     return (
@@ -33,11 +38,17 @@ function App() {
   }, [form]);
 
   async function handleSearch() {
+    await handleSearchForPage(1);
+  }
+
+  async function handleSearchForPage(requestedPage: number) {
     if (!canSubmit) {
       setError("Enter at least one filter to run a search.");
       setResults(null);
       return;
     }
+
+    const normalizedLimit = normalizeLimit(form.limit);
 
     setIsLoading(true);
     setError(null);
@@ -48,9 +59,12 @@ function App() {
         marketing_name: form.marketingName || undefined,
         device: form.device || undefined,
         model: form.model || undefined,
-        limit: form.limit,
+        limit: normalizedLimit,
+        page: requestedPage,
       });
       setResults(data);
+      setPage(data.page);
+      setForm((prev) => ({ ...prev, limit: String(normalizedLimit) }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unexpected error";
       setError(message);
@@ -62,13 +76,39 @@ function App() {
 
   function updateField<T extends keyof FormState>(key: T, value: FormState[T]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setPage(1);
   }
 
   function clearForm() {
     setForm(initialFormState);
     setResults(null);
     setError(null);
+    setPage(1);
   }
+
+  function normalizeLimit(raw: string): number {
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+      return DEFAULT_LIMIT;
+    }
+
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed)) {
+      return DEFAULT_LIMIT;
+    }
+
+    const bounded = Math.min(500, Math.max(1, Math.floor(parsed)));
+    return bounded;
+  }
+
+  const totalPages = results?.total_pages ?? 0;
+  const totalMatches = results?.total_matches ?? 0;
+  const currentPage = results?.page ?? 1;
+  const hasRows = !!results && results.results.length > 0;
+  const canGoPrev = totalMatches > 0 && currentPage > 1;
+  const canGoNext = totalMatches > 0 && totalPages > 0 && currentPage < totalPages;
+  const startIndex = hasRows ? (currentPage - 1) * results.limit + 1 : 0;
+  const endIndex = hasRows ? startIndex + results.results.length - 1 : 0;
 
   return (
     <div className="layout">
@@ -136,12 +176,21 @@ function App() {
               min={1}
               max={500}
               value={form.limit}
-                onChange={(event) =>
-                  updateField(
-                    "limit",
-                    Math.min(500, Math.max(1, Number(event.target.value) || initialFormState.limit))
-                  )
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                if (nextValue === "") {
+                  updateField("limit", "");
+                  return;
                 }
+
+                const numeric = Number(nextValue);
+                if (!Number.isFinite(numeric)) {
+                  return;
+                }
+
+                const bounded = Math.min(500, Math.max(1, Math.floor(numeric)));
+                updateField("limit", String(bounded));
+              }}
             />
           </label>
             </div>
@@ -163,16 +212,18 @@ function App() {
       <section className="card">
         <header className="card-header">
           <h2>Results</h2>
-          {results && (
+          {hasRows ? (
             <span>
-              Showing up to {results.limit} of {results.total_matches} matches
+              Showing {startIndex}–{endIndex} of {results.total_matches} matches
             </span>
-          )}
+          ) : totalMatches > 0 ? (
+            <span>Total matches: {results.total_matches}</span>
+          ) : null}
         </header>
 
         {isLoading ? (
           <p className="hint">Loading results…</p>
-        ) : results && results.results.length > 0 ? (
+        ) : hasRows ? (
           <div className="table-wrapper">
             <table>
               <thead>
@@ -194,7 +245,55 @@ function App() {
                 ))}
               </tbody>
             </table>
+            <div className="pagination">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void handleSearchForPage(page - 1)}
+                disabled={!canGoPrev || isLoading}
+              >
+                Previous
+              </button>
+              <span>
+                Page {currentPage} of {Math.max(totalPages, currentPage || 1)}
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void handleSearchForPage(page + 1)}
+                disabled={!canGoNext || isLoading}
+              >
+                Next
+              </button>
+            </div>
           </div>
+        ) : results && totalMatches > 0 ? (
+          <>
+            <p className="hint">No results on this page. Try a different page.</p>
+            <div className="pagination">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void handleSearchForPage(Math.max(1, page - 1))}
+                disabled={!canGoPrev || isLoading}
+              >
+                Previous
+              </button>
+              <span>
+                Page {currentPage} of {Math.max(totalPages, currentPage || 1)}
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void handleSearchForPage(page + 1)}
+                disabled={!canGoNext || isLoading}
+              >
+                Next
+              </button>
+            </div>
+          </>
+        ) : results ? (
+          <p className="hint">No matches found for the current filters.</p>
         ) : (
           <p className="hint">No results yet. Enter a filter above to start.</p>
         )}

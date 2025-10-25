@@ -51,6 +51,8 @@ def test_check_filters_results(client: TestClient) -> None:
 
     payload = response.json()
     assert payload["total_matches"] == 1
+    assert payload["page"] == 1
+    assert payload["total_pages"] == 1
     assert payload["results"][0]["marketing_name"] == "Pixel 9"
 
 
@@ -60,4 +62,20 @@ def test_check_respects_limit(client: TestClient) -> None:
 
     payload = response.json()
     assert payload["total_matches"] == 2
+    assert payload["limit"] == 1
+    assert payload["page"] == 1
+    assert payload["total_pages"] == 2
     assert len(payload["results"]) == 1
+
+
+def test_check_pagination_second_page(client: TestClient) -> None:
+    response = client.get("/check", params={"brand": "o", "limit": 1, "page": 2})
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert payload["total_matches"] == 2
+    assert payload["limit"] == 1
+    assert payload["page"] == 2
+    assert payload["total_pages"] == 2
+    assert len(payload["results"]) == 1
+    assert payload["results"][0]["marketing_name"] == "Phone (2)"

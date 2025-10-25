@@ -203,6 +203,20 @@ tbody tr:hover {
   text-decoration: underline;
 }
 
+.pagination {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pagination span {
+  color: #475569;
+  font-weight: 600;
+}
+
 @media (max-width: 720px) {
   .layout {
     padding-top: 2rem;

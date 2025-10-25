@@ -8,10 +8,12 @@ export interface DeviceRecord {
 export interface DeviceLookupResponse {
   total_matches: number;
   limit: number;
+  page: number;
+  total_pages: number;
   results: DeviceRecord[];
 }
 
-const DEFAULT_LIMIT = 25;
+export const DEFAULT_LIMIT = 25;
 
 const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "") as string;
 const apiBaseUrl = rawBaseUrl ? rawBaseUrl.replace(/\/$/, "") : "/api";
@@ -33,8 +35,9 @@ export async function lookupDevices(params: {
   device?: string;
   model?: string;
   limit?: number;
+  page?: number;
 }) {
-  const query = buildQuery({ limit: DEFAULT_LIMIT, ...params });
+  const query = buildQuery({ limit: DEFAULT_LIMIT, page: 1, ...params });
   const url = `${apiBaseUrl}/check?${query}`;
   const response = await fetch(url, {
     headers: {
