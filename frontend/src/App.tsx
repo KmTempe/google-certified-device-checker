@@ -311,14 +311,8 @@ function App() {
           </a>
         </span>
         <span>
-          Need help? Use the {" "}
-          <a
-            href="https://contact.ausrine.giize.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            contact form
-          </a>
+          Need help? Email {" "}
+          <a href="mailto:level7feeders@gmail.com">level7feeders@gmail.com</a>
           .
         </span>
       </footer>
