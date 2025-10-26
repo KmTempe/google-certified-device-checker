@@ -149,8 +149,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         cache_clear()
 
 
-# Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Initialize rate limiter with token bucket algorithm
+# 50 requests per 30 minutes with burst allowance of 20 requests per 5 minutes
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri="memory://",
+    strategy="moving-window",
+)
 
 app = FastAPI(title=APP_TITLE, lifespan=lifespan)
 app.state.limiter = limiter
@@ -178,7 +183,7 @@ async def read_health() -> dict[str, str]:
     response_model=DeviceLookupResponse,
     tags=["devices"],
 )
-@limiter.limit("100/hour")
+@limiter.limit("50/30minutes;20/5minutes")
 async def check_device(
     request: Request,
     brand: Optional[str] = Query(
