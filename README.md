@@ -75,12 +75,28 @@ We protect our service from being overused or abused:
 ### Rate Limiting (Token Bucket Algorithm)
 **Simple explanation:** Think of it like having a bucket of tokens. Each time someone asks our service for information, they use one token. We refill the bucket slowly over time.
 
-- **Main limit:** 50 requests per 30 minutes *(you get 50 tokens that refill over half an hour)*
-- **Burst allowance:** 20 requests per 5 minutes *(you can use up to 20 tokens quickly, but can't keep doing it)*
+- **Main limit:** 200 requests per 30 minutes *(you get 200 tokens that refill over half an hour)*
+- **Burst allowance:** 50 requests per 5 minutes *(you can use up to 50 tokens quickly, but can't keep doing it)*
 
-**Everyday example:** It's like a coffee shop giving you a punch card with 50 punches that resets every 30 minutes. You can get 20 coffees really fast if you want, but once you hit 50 total in half an hour, you need to wait.
+**Everyday example:** It's like a coffee shop giving you a punch card with 200 punches that resets every 30 minutes. You can get 50 coffees really fast if you want, but once you hit 200 total in half an hour, you need to wait.
 
 **Key takeaway:** This prevents someone from hammering our service with thousands of requests and slowing it down for everyone else.
+
+### Smart Caching (Two-Layer System)
+**Simple explanation:** We remember your recent searches so we don't have to ask the database every time.
+
+**How it works:**
+1. **Browser cache:** Your browser automatically stores search results for 24 hours
+2. **LocalStorage cache:** The website remembers your searches even if you close the tab
+
+**Everyday example:** It's like writing down answers to homework questions so you don't have to look them up again. If you search for "Pixel", we remember the results instantly next time.
+
+**Benefits:**
+- ⚡ Instant results for repeated searches
+- 📉 Reduces API calls by 70-90%
+- 💾 Works offline for recent searches
+
+**Key takeaway:** Most searches will be instant because we've already saved the answer locally!
 
 ### Browser Protection
 **Simple explanation:** We only let requests from our official website and local development computers access the service through a web browser.

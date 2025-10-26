@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -186,6 +186,7 @@ async def read_health() -> dict[str, str]:
 @limiter.limit("200/30minutes;50/5minutes")
 async def check_device(
     request: Request,
+    response: Response,
     brand: Optional[str] = Query(
         None, description="Filter by retail brand (case-insensitive substring match)."
     ),
@@ -215,6 +216,10 @@ async def check_device(
             status_code=400,
             detail="At least one filter parameter (brand, marketing_name, device, model) is required.",
         )
+
+    # Add HTTP cache headers (24 hours since dataset updates daily)
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    response.headers["Vary"] = "Accept-Encoding"
 
     return _filter_devices(
         brand=brand,

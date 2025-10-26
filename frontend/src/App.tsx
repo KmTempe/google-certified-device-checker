@@ -4,6 +4,12 @@ import {
   lookupDevices,
   type DeviceLookupResponse,
 } from "./api";
+import {
+  generateCacheKey,
+  getCachedData,
+  setCachedData,
+  clearOldCache,
+} from "./cache";
 
 interface FormState {
   brand: string;
@@ -50,6 +56,26 @@ function App() {
 
     const normalizedLimit = normalizeLimit(form.limit);
 
+    // Generate cache key for this search
+    const cacheKey = generateCacheKey({
+      brand: form.brand || undefined,
+      marketingName: form.marketingName || undefined,
+      device: form.device || undefined,
+      model: form.model || undefined,
+      limit: normalizedLimit,
+      page: requestedPage,
+    });
+
+    // Check cache first
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      setResults(cachedData);
+      setPage(cachedData.page);
+      setForm((prev) => ({ ...prev, limit: String(normalizedLimit) }));
+      setError(null);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -62,9 +88,18 @@ function App() {
         limit: normalizedLimit,
         page: requestedPage,
       });
+      
+      // Cache the successful response
+      setCachedData(cacheKey, data);
+      
       setResults(data);
       setPage(data.page);
       setForm((prev) => ({ ...prev, limit: String(normalizedLimit) }));
+      
+      // Clean up old cache entries periodically
+      if (Math.random() < 0.1) {
+        clearOldCache();
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unexpected error";
       setError(message);

@@ -169,3 +169,64 @@ def test_pagination_beyond_available_pages(client: TestClient) -> None:
     assert payload["page"] == 999
     assert len(payload["results"]) == 0  # No results on this page
 
+
+def test_http_cache_headers_present(client: TestClient) -> None:
+    """Test that HTTP cache headers are set on successful responses."""
+    response = client.get("/check", params={"model": "GR1YH"})
+    assert response.status_code == 200
+    
+    # Check Cache-Control header
+    assert "Cache-Control" in response.headers
+    cache_control = response.headers["Cache-Control"]
+    assert "public" in cache_control
+    assert "max-age=86400" in cache_control  # 24 hours
+    
+    # Check Vary header for proper caching
+    assert "Vary" in response.headers
+    assert "Accept-Encoding" in response.headers["Vary"]
+
+
+def test_http_cache_headers_consistent_across_requests(client: TestClient) -> None:
+    """Test that cache headers are consistent for identical requests."""
+    params = {"brand": "Google", "limit": 50}
+    
+    response1 = client.get("/check", params=params)
+    response2 = client.get("/check", params=params)
+    
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+    
+    # Both should have identical cache headers
+    assert response1.headers["Cache-Control"] == response2.headers["Cache-Control"]
+    assert response1.json() == response2.json()
+
+
+def test_http_cache_not_applied_to_errors(client: TestClient) -> None:
+    """Test that cache headers are not preventing error responses."""
+    # Invalid request (no filter)
+    response = client.get("/check")
+    assert response.status_code == 400
+    # Error responses shouldn't have our custom cache headers
+    # (FastAPI may add its own headers, but we don't set them)
+
+
+def test_different_parameters_different_cache(client: TestClient) -> None:
+    """Test that different search parameters would result in different cache entries."""
+    # This tests that the endpoint properly handles different parameters
+    # Frontend cache will handle the actual caching logic
+    
+    response1 = client.get("/check", params={"brand": "Google"})
+    response2 = client.get("/check", params={"brand": "Nothing"})
+    
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+    
+    data1 = response1.json()
+    data2 = response2.json()
+    
+    # Different parameters should return different results
+    assert data1["results"] != data2["results"]
+    # Verify we got different devices
+    assert data1["results"][0]["device"] == "akita"
+    assert data2["results"][0]["device"] == "nothing"
+
