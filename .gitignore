@@ -18,25 +18,21 @@ venv/
 .vscode/
 .idea/
 
+# Environment variables
+.env
+.env.local
+.env.prod
+
 # Node.js / Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/.turbo/
-frontend/.env.local
-frontend/.env.prod
-
-.env
-.env.local
-.env.prod
 
 # OS artifacts
 .DS_Store
 Thumbs.db
 
-# Docs
-README.md
-
-
+# Project-specific ignores
 KNOWN_ISSUES.md
 test-rate-limiter.js
