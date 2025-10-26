@@ -7,9 +7,12 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 APP_TITLE = "Google Certified Device Checker"
 CSV_FILENAME = "supported_devices.csv"
@@ -146,12 +149,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         cache_clear()
 
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title=APP_TITLE, lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=[
+        "https://kmtempe.github.io",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
@@ -166,7 +178,9 @@ async def read_health() -> dict[str, str]:
     response_model=DeviceLookupResponse,
     tags=["devices"],
 )
+@limiter.limit("100/hour")
 async def check_device(
+    request: Request,
     brand: Optional[str] = Query(
         None, description="Filter by retail brand (case-insensitive substring match)."
     ),

@@ -79,3 +79,93 @@ def test_check_pagination_second_page(client: TestClient) -> None:
     assert payload["total_pages"] == 2
     assert len(payload["results"]) == 1
     assert payload["results"][0]["marketing_name"] == "Phone (2)"
+
+
+def test_rate_limit_allows_multiple_requests(client: TestClient) -> None:
+    """Test that multiple requests within rate limit succeed."""
+    # Make several requests well under the 100/hour limit
+    # In test mode, rate limiting is in-memory and should allow these
+    for _ in range(5):
+        response = client.get("/check", params={"brand": "Google"})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total_matches"] == 1
+
+
+def test_rate_limiter_configured(client: TestClient) -> None:
+    """Test that rate limiter is properly configured on the app."""
+    # Verify that the app has rate limiter state
+    assert hasattr(main.app.state, "limiter")
+    assert main.app.state.limiter is not None
+
+
+def test_cors_allows_configured_origins(client: TestClient) -> None:
+    """Test that CORS middleware is configured."""
+    
+    # Test with production origin
+    response = client.get(
+        "/check",
+        params={"brand": "Google"},
+        headers={"Origin": "https://kmtempe.github.io"}
+    )
+    assert response.status_code == 200
+    
+    # Test with local dev origin
+    response = client.get(
+        "/check",
+        params={"brand": "Google"},
+        headers={"Origin": "http://localhost:5173"}
+    )
+    assert response.status_code == 200
+
+
+def test_health_endpoint_always_accessible(client: TestClient) -> None:
+    """Test that health endpoint is accessible."""
+    for _ in range(10):
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+
+def test_invalid_page_number(client: TestClient) -> None:
+    """Test that invalid page numbers are rejected."""
+    response = client.get("/check", params={"brand": "Google", "page": 0})
+    assert response.status_code == 422  # Validation error
+    
+    response = client.get("/check", params={"brand": "Google", "page": -1})
+    assert response.status_code == 422
+
+
+def test_invalid_limit(client: TestClient) -> None:
+    """Test that invalid limits are rejected."""
+    response = client.get("/check", params={"brand": "Google", "limit": 0})
+    assert response.status_code == 422
+    
+    response = client.get("/check", params={"brand": "Google", "limit": 501})
+    assert response.status_code == 422
+    
+    response = client.get("/check", params={"brand": "Google", "limit": -10})
+    assert response.status_code == 422
+
+
+def test_pagination_with_no_results(client: TestClient) -> None:
+    """Test pagination behavior when no results match."""
+    response = client.get("/check", params={"brand": "NonExistent", "page": 1})
+    assert response.status_code == 200
+    
+    payload = response.json()
+    assert payload["total_matches"] == 0
+    assert payload["total_pages"] == 0
+    assert len(payload["results"]) == 0
+
+
+def test_pagination_beyond_available_pages(client: TestClient) -> None:
+    """Test requesting a page number beyond available results."""
+    response = client.get("/check", params={"brand": "Google", "page": 999})
+    assert response.status_code == 200
+    
+    payload = response.json()
+    assert payload["total_matches"] == 1
+    assert payload["page"] == 999
+    assert len(payload["results"]) == 0  # No results on this page
+
