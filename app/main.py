@@ -183,7 +183,7 @@ async def read_health() -> dict[str, str]:
     response_model=DeviceLookupResponse,
     tags=["devices"],
 )
-@limiter.limit("50/30minutes;20/5minutes")
+@limiter.limit("200/30minutes;50/5minutes")
 async def check_device(
     request: Request,
     brand: Optional[str] = Query(
