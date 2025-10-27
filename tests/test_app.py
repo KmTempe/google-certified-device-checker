@@ -102,7 +102,7 @@ def test_check_pagination_second_page(client: TestClient) -> None:
 
 def test_rate_limit_allows_multiple_requests(client: TestClient) -> None:
     """Test that multiple requests within rate limit succeed."""
-    # Make several requests well under the 100/hour limit
+    # Make several requests well under the 50-per-5-minute burst limit
     # In test mode, rate limiting is in-memory and should allow these
     for _ in range(5):
         response = client.get("/check", params={"brand": "Google"})
@@ -112,8 +112,8 @@ def test_rate_limit_allows_multiple_requests(client: TestClient) -> None:
 
 
 def test_rate_limit_blocks_after_threshold(client: TestClient) -> None:
-    """Rate limiter should return 429 once the hourly quota is exceeded."""
-    for _ in range(100):
+    """Rate limiter should return 429 once the burst quota is exceeded."""
+    for _ in range(50):
         ok_response = client.get("/check", params={"brand": "Google"})
         assert ok_response.status_code == 200
 
@@ -124,7 +124,7 @@ def test_rate_limit_blocks_after_threshold(client: TestClient) -> None:
 def test_rate_limit_uses_forwarded_for_header(client: TestClient) -> None:
     """Ensure X-Forwarded-For is honoured when computing the rate-limit key."""
     headers = {"x-forwarded-for": "203.0.113.5"}
-    for _ in range(100):
+    for _ in range(50):
         ok_response = client.get("/check", params={"brand": "Google"}, headers=headers)
         assert ok_response.status_code == 200
 
