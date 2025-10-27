@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import lru_cache
@@ -17,6 +19,34 @@ from slowapi.util import get_remote_address
 APP_TITLE = "Google Certified Device Checker"
 CSV_FILENAME = "supported_devices.csv"
 DEFAULT_LIMIT = 50
+
+
+def _read_bool_env(name: str, default: bool = False) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip().lower()
+    return normalized in {"1", "true", "yes", "on"}
+
+
+def _read_float_env(name: str, default: float = 0.0) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return float(raw_value)
+    except ValueError:
+        return default
+
+
+SIMULATE_COLD_START = _read_bool_env("SIMULATE_COLD_START", default=False)
+COLD_START_DELAY_SECONDS = max(
+    0.0, _read_float_env("COLD_START_DELAY_SECONDS", default=0.0)
+)
+
+_cold_start_pending = SIMULATE_COLD_START and COLD_START_DELAY_SECONDS > 0.0
+_cold_start_lock: asyncio.Lock | None = None
+_cold_start_task: asyncio.Task[None] | None = None
 
 
 def _data_path() -> Path:
@@ -137,6 +167,38 @@ def _filter_devices(
     )
 
 
+async def _complete_cold_start() -> None:
+    global _cold_start_pending, _cold_start_task
+    try:
+        await asyncio.sleep(COLD_START_DELAY_SECONDS)
+        _cold_start_pending = False
+    finally:
+        _cold_start_task = None
+
+
+async def _ensure_service_ready() -> None:
+    global _cold_start_lock, _cold_start_task
+    if not _cold_start_pending:
+        return
+
+    if _cold_start_lock is None:
+        _cold_start_lock = asyncio.Lock()
+
+    async with _cold_start_lock:
+        if not _cold_start_pending:
+            return
+
+        if _cold_start_task is None:
+            _cold_start_task = asyncio.create_task(_complete_cold_start())
+
+        retry_after = max(1, int(COLD_START_DELAY_SECONDS)) if COLD_START_DELAY_SECONDS else 1
+        raise HTTPException(
+            status_code=503,
+            detail="Service is warming up. Please retry shortly.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     try:
@@ -170,7 +232,8 @@ app.add_middleware(
 
 @app.get("/health", tags=["health"])  # pragma: no cover - trivial
 async def read_health() -> dict[str, str]:
-    return {"status": "ok"}
+    status = "initializing" if _cold_start_pending else "ok"
+    return {"status": status}
 
 
 @app.get(
@@ -205,6 +268,8 @@ async def check_device(
         description="Page number to return (1-indexed).",
     ),
 ) -> DeviceLookupResponse:
+    await _ensure_service_ready()
+
     if not any([brand, marketing_name, device, model]):
         raise HTTPException(
             status_code=400,

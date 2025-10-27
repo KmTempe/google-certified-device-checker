@@ -39,6 +39,13 @@ def test_health_endpoint(client: TestClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_health_reports_initializing_when_cold_start(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    monkeypatch.setattr(main, "_cold_start_pending", True)
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "initializing"}
+
+
 def test_check_requires_filter(client: TestClient) -> None:
     response = client.get("/check")
     assert response.status_code == 400
@@ -168,4 +175,17 @@ def test_pagination_beyond_available_pages(client: TestClient) -> None:
     assert payload["total_matches"] == 1
     assert payload["page"] == 999
     assert len(payload["results"]) == 0  # No results on this page
+
+
+def test_check_returns_503_during_simulated_cold_start(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    monkeypatch.setattr(main, "_cold_start_pending", True)
+    monkeypatch.setattr(main, "COLD_START_DELAY_SECONDS", 2.0)
+    monkeypatch.setattr(main, "_cold_start_lock", None)
+    monkeypatch.setattr(main, "_cold_start_task", None)
+
+    response = client.get("/check", params={"brand": "Google"})
+    assert response.status_code == 503
+    assert "Retry-After" in response.headers
 

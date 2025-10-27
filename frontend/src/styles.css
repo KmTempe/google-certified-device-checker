@@ -143,6 +143,16 @@ button:disabled {
   font-weight: 600;
 }
 
+.status {
+  margin: 0;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.cache-status {
+  color: #0ea5e9;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;

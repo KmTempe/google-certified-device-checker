@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_LIMIT,
   lookupDevices,
   type DeviceLookupResponse,
+  ServiceWarmingError,
+  getCachedLookupResult,
 } from "./api";
 
 interface FormState {
@@ -21,12 +23,47 @@ const initialFormState: FormState = {
   limit: String(DEFAULT_LIMIT),
 };
 
+const WARMUP_MIN_DELAY_SECONDS = 20;
+
 function App() {
   const [form, setForm] = useState<FormState>(initialFormState);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isWaitingForWarmup, setIsWaitingForWarmup] = useState(false);
   const [results, setResults] = useState<DeviceLookupResponse | null>(null);
   const [page, setPage] = useState(1);
+  const warmupRetryTimer = useRef<number | null>(null);
+  const warmupCountdownTimer = useRef<number | null>(null);
+  const [warmupRetryCount, setWarmupRetryCount] = useState(0);
+  const [warmupRemainingSeconds, setWarmupRemainingSeconds] = useState<number | null>(null);
+  const [warmupMessage, setWarmupMessage] = useState<string | null>(null);
+  const [cacheStatusMessage, setCacheStatusMessage] = useState<string | null>(null);
+  const [isUsingCachedResults, setIsUsingCachedResults] = useState(false);
+
+  function stopWarmupTimers() {
+    if (warmupRetryTimer.current !== null) {
+      window.clearTimeout(warmupRetryTimer.current);
+      warmupRetryTimer.current = null;
+    }
+    if (warmupCountdownTimer.current !== null) {
+      window.clearInterval(warmupCountdownTimer.current);
+      warmupCountdownTimer.current = null;
+    }
+  }
+
+  function resetWarmupState() {
+    stopWarmupTimers();
+    setIsWaitingForWarmup(false);
+    setWarmupMessage(null);
+    setWarmupRemainingSeconds(null);
+    setWarmupRetryCount(0);
+  }
+
+  useEffect(() => {
+    return () => {
+      stopWarmupTimers();
+    };
+  }, []);
 
   const canSubmit = useMemo(() => {
     return (
@@ -37,39 +74,144 @@ function App() {
     );
   }, [form]);
 
-  async function handleSearch() {
-    await handleSearchForPage(1);
+  async function handleSearch(forceRemote = false) {
+    await handleSearchForPage(1, { forceRemote });
   }
 
-  async function handleSearchForPage(requestedPage: number) {
+  async function handleSearchForPage(
+    requestedPage: number,
+    options: { forceRemote?: boolean; fromWarmupRetry?: boolean } = {}
+  ) {
+    const { forceRemote = false, fromWarmupRetry = false } = options;
+
     if (!canSubmit) {
       setError("Enter at least one filter to run a search.");
       setResults(null);
+      setCacheStatusMessage(null);
+      setIsUsingCachedResults(false);
+      setIsLoading(false);
       return;
     }
 
+    if (fromWarmupRetry) {
+      stopWarmupTimers();
+    } else {
+      resetWarmupState();
+      setCacheStatusMessage(null);
+    }
+
     const normalizedLimit = normalizeLimit(form.limit);
+
+    const lookupParams = {
+      brand: form.brand || undefined,
+      marketing_name: form.marketingName || undefined,
+      device: form.device || undefined,
+      model: form.model || undefined,
+      limit: normalizedLimit,
+      page: requestedPage,
+    };
+
+    const cachedResult = getCachedLookupResult(lookupParams);
+
+    if (cachedResult) {
+      setResults(cachedResult);
+      setPage(cachedResult.page);
+    }
+
+    if (cachedResult && !forceRemote && !fromWarmupRetry) {
+      setError(null);
+      setIsLoading(false);
+      setIsUsingCachedResults(true);
+      setCacheStatusMessage(
+        "Showing cached results. Use Refresh from Service to fetch the latest data."
+      );
+      return;
+    }
+
+    if (cachedResult && !fromWarmupRetry) {
+      setCacheStatusMessage("Refreshing results from the service…");
+      setIsUsingCachedResults(true);
+    } else if (!fromWarmupRetry) {
+      setIsUsingCachedResults(false);
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await lookupDevices({
-        brand: form.brand || undefined,
-        marketing_name: form.marketingName || undefined,
-        device: form.device || undefined,
-        model: form.model || undefined,
-        limit: normalizedLimit,
-        page: requestedPage,
-      });
+      const data = await lookupDevices(lookupParams);
+      resetWarmupState();
       setResults(data);
       setPage(data.page);
       setForm((prev) => ({ ...prev, limit: String(normalizedLimit) }));
+      setCacheStatusMessage(null);
+      setIsUsingCachedResults(false);
+      setIsLoading(false);
     } catch (err) {
+      if (err instanceof ServiceWarmingError) {
+        const retrySeconds = Math.max(
+          WARMUP_MIN_DELAY_SECONDS,
+          Math.ceil(err.retryAfterSeconds)
+        );
+        stopWarmupTimers();
+        setIsWaitingForWarmup(true);
+        const warmupText = err.message || "Service is warming up.";
+        setWarmupMessage(
+          cachedResult
+            ? `${warmupText} Showing cached results while we retry.`
+            : warmupText
+        );
+        setWarmupRetryCount((prev) => prev + 1);
+        setWarmupRemainingSeconds(retrySeconds);
+        warmupCountdownTimer.current = window.setInterval(() => {
+          setWarmupRemainingSeconds((prevSeconds) => {
+            if (prevSeconds === null) {
+              return prevSeconds;
+            }
+            if (prevSeconds <= 1) {
+              if (warmupCountdownTimer.current !== null) {
+                window.clearInterval(warmupCountdownTimer.current);
+                warmupCountdownTimer.current = null;
+              }
+              return 0;
+            }
+            return prevSeconds - 1;
+          });
+        }, 1000);
+        warmupRetryTimer.current = window.setTimeout(() => {
+          warmupRetryTimer.current = null;
+          void handleSearchForPage(requestedPage, {
+            fromWarmupRetry: true,
+            forceRemote,
+          });
+        }, retrySeconds * 1000);
+        if (cachedResult) {
+          setIsUsingCachedResults(true);
+          setCacheStatusMessage(
+            "Showing cached results while the service wakes up."
+          );
+        } else {
+          setIsUsingCachedResults(false);
+          setCacheStatusMessage(null);
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      resetWarmupState();
       const message = err instanceof Error ? err.message : "Unexpected error";
-      setError(message);
-      setResults(null);
-    } finally {
+      if (cachedResult) {
+        setError(`${message}. Showing cached results from a previous search.`);
+        setIsUsingCachedResults(true);
+        setCacheStatusMessage(
+          "Showing cached results. Use Refresh from Service to fetch the latest data."
+        );
+      } else {
+        setError(message);
+        setResults(null);
+        setIsUsingCachedResults(false);
+        setCacheStatusMessage(null);
+      }
       setIsLoading(false);
     }
   }
@@ -77,12 +219,18 @@ function App() {
   function updateField<T extends keyof FormState>(key: T, value: FormState[T]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setPage(1);
+    setCacheStatusMessage(null);
+    setIsUsingCachedResults(false);
   }
 
   function clearForm() {
+    resetWarmupState();
     setForm(initialFormState);
     setResults(null);
     setError(null);
+    setCacheStatusMessage(null);
+    setIsUsingCachedResults(false);
+    setIsLoading(false);
     setPage(1);
   }
 
@@ -109,6 +257,17 @@ function App() {
   const canGoNext = totalMatches > 0 && totalPages > 0 && currentPage < totalPages;
   const startIndex = hasRows ? (currentPage - 1) * results.limit + 1 : 0;
   const endIndex = hasRows ? startIndex + results.results.length - 1 : 0;
+
+  const warmupStatusMessage =
+    isWaitingForWarmup && warmupMessage && warmupRetryCount > 0
+      ? warmupRemainingSeconds === null
+        ? `${warmupMessage} Retry #${warmupRetryCount} scheduled.`
+        : warmupRemainingSeconds > 0
+        ? `${warmupMessage} Retry #${warmupRetryCount} in ~${warmupRemainingSeconds} second${
+            warmupRemainingSeconds === 1 ? "" : "s"
+          }…`
+        : `${warmupMessage} Retry #${warmupRetryCount} in progress…`
+      : null;
 
   return (
     <div className="layout">
@@ -199,13 +358,35 @@ function App() {
               <button type="button" onClick={clearForm} className="secondary">
                 Clear
               </button>
-              <button type="submit" disabled={!canSubmit || isLoading} className="primary">
-                {isLoading ? "Searching…" : "Search"}
+              {isUsingCachedResults && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSearchForPage(page, { forceRemote: true });
+                  }}
+                  className="secondary"
+                  disabled={isLoading || isWaitingForWarmup}
+                >
+                  Refresh from Service
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={!canSubmit || isLoading || isWaitingForWarmup}
+                className="primary"
+              >
+                {isWaitingForWarmup
+                  ? "Warming up…"
+                  : isLoading
+                  ? "Searching…"
+                  : "Search"}
               </button>
             </div>
           </form>
 
         {!canSubmit && <p className="hint">Enter at least one filter to run a search.</p>}
+        {cacheStatusMessage && <p className="status cache-status">{cacheStatusMessage}</p>}
+        {warmupStatusMessage && <p className="status">{warmupStatusMessage}</p>}
         {error && <p className="error">{error}</p>}
       </section>
 
