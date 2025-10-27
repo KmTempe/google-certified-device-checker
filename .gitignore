@@ -34,6 +34,9 @@ frontend/.env.prod
 .DS_Store
 Thumbs.db
 
+# Logs
+logs/
+
 # Docs
 README.md
 
