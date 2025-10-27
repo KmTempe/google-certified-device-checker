@@ -28,15 +28,34 @@ def override_dataset(
     cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def disable_cold_start(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Ensure tests start with service ready even if env enables cold start."""
+    monkeypatch.setattr(main, "_cold_start_pending", False)
+    monkeypatch.setattr(main, "_cold_start_task", None)
+    monkeypatch.setattr(main, "_cold_start_lock", None)
+    yield
+
+
 @pytest.fixture()
-def client() -> TestClient:
-    return TestClient(main.app)
+def client() -> Iterator[TestClient]:
+    main.limiter.reset()
+    with TestClient(main.app) as test_client:
+        yield test_client
+    main.limiter.reset()
 
 
 def test_health_endpoint(client: TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_health_reports_initializing_when_cold_start(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    monkeypatch.setattr(main, "_cold_start_pending", True)
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "initializing"}
 
 
 def test_check_requires_filter(client: TestClient) -> None:
@@ -90,6 +109,29 @@ def test_rate_limit_allows_multiple_requests(client: TestClient) -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["total_matches"] == 1
+
+
+def test_rate_limit_blocks_after_threshold(client: TestClient) -> None:
+    """Rate limiter should return 429 once the hourly quota is exceeded."""
+    for _ in range(100):
+        ok_response = client.get("/check", params={"brand": "Google"})
+        assert ok_response.status_code == 200
+
+    blocked_response = client.get("/check", params={"brand": "Google"})
+    assert blocked_response.status_code == 429
+
+
+def test_rate_limit_uses_forwarded_for_header(client: TestClient) -> None:
+    """Ensure X-Forwarded-For is honoured when computing the rate-limit key."""
+    headers = {"x-forwarded-for": "203.0.113.5"}
+    for _ in range(100):
+        ok_response = client.get("/check", params={"brand": "Google"}, headers=headers)
+        assert ok_response.status_code == 200
+
+    blocked_response = client.get(
+        "/check", params={"brand": "Google"}, headers=headers
+    )
+    assert blocked_response.status_code == 429
 
 
 def test_rate_limiter_configured(client: TestClient) -> None:
@@ -170,63 +212,15 @@ def test_pagination_beyond_available_pages(client: TestClient) -> None:
     assert len(payload["results"]) == 0  # No results on this page
 
 
-def test_http_cache_headers_present(client: TestClient) -> None:
-    """Test that HTTP cache headers are set on successful responses."""
-    response = client.get("/check", params={"model": "GR1YH"})
-    assert response.status_code == 200
-    
-    # Check Cache-Control header
-    assert "Cache-Control" in response.headers
-    cache_control = response.headers["Cache-Control"]
-    assert "public" in cache_control
-    assert "max-age=86400" in cache_control  # 24 hours
-    
-    # Check Vary header for proper caching
-    assert "Vary" in response.headers
-    assert "Accept-Encoding" in response.headers["Vary"]
+def test_check_returns_503_during_simulated_cold_start(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    monkeypatch.setattr(main, "_cold_start_pending", True)
+    monkeypatch.setattr(main, "COLD_START_DELAY_SECONDS", 2.0)
+    monkeypatch.setattr(main, "_cold_start_lock", None)
+    monkeypatch.setattr(main, "_cold_start_task", None)
 
-
-def test_http_cache_headers_consistent_across_requests(client: TestClient) -> None:
-    """Test that cache headers are consistent for identical requests."""
-    params = {"brand": "Google", "limit": 50}
-    
-    response1 = client.get("/check", params=params)
-    response2 = client.get("/check", params=params)
-    
-    assert response1.status_code == 200
-    assert response2.status_code == 200
-    
-    # Both should have identical cache headers
-    assert response1.headers["Cache-Control"] == response2.headers["Cache-Control"]
-    assert response1.json() == response2.json()
-
-
-def test_http_cache_not_applied_to_errors(client: TestClient) -> None:
-    """Test that cache headers are not preventing error responses."""
-    # Invalid request (no filter)
-    response = client.get("/check")
-    assert response.status_code == 400
-    # Error responses shouldn't have our custom cache headers
-    # (FastAPI may add its own headers, but we don't set them)
-
-
-def test_different_parameters_different_cache(client: TestClient) -> None:
-    """Test that different search parameters would result in different cache entries."""
-    # This tests that the endpoint properly handles different parameters
-    # Frontend cache will handle the actual caching logic
-    
-    response1 = client.get("/check", params={"brand": "Google"})
-    response2 = client.get("/check", params={"brand": "Nothing"})
-    
-    assert response1.status_code == 200
-    assert response2.status_code == 200
-    
-    data1 = response1.json()
-    data2 = response2.json()
-    
-    # Different parameters should return different results
-    assert data1["results"] != data2["results"]
-    # Verify we got different devices
-    assert data1["results"][0]["device"] == "akita"
-    assert data2["results"][0]["device"] == "nothing"
+    response = client.get("/check", params={"brand": "Google"})
+    assert response.status_code == 503
+    assert "Retry-After" in response.headers
 

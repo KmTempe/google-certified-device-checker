@@ -33,6 +33,12 @@ frontend/.turbo/
 .DS_Store
 Thumbs.db
 
-# Project-specific ignores
+# Logs
+logs/
+
+# Docs
+README.md
+
+
 KNOWN_ISSUES.md
 test-rate-limiter.js
