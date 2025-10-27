@@ -28,9 +28,21 @@ def override_dataset(
     cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def disable_cold_start(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Ensure tests start with service ready even if env enables cold start."""
+    monkeypatch.setattr(main, "_cold_start_pending", False)
+    monkeypatch.setattr(main, "_cold_start_task", None)
+    monkeypatch.setattr(main, "_cold_start_lock", None)
+    yield
+
+
 @pytest.fixture()
-def client() -> TestClient:
-    return TestClient(main.app)
+def client() -> Iterator[TestClient]:
+    main.limiter.reset()
+    with TestClient(main.app) as test_client:
+        yield test_client
+    main.limiter.reset()
 
 
 def test_health_endpoint(client: TestClient) -> None:
@@ -97,6 +109,29 @@ def test_rate_limit_allows_multiple_requests(client: TestClient) -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["total_matches"] == 1
+
+
+def test_rate_limit_blocks_after_threshold(client: TestClient) -> None:
+    """Rate limiter should return 429 once the hourly quota is exceeded."""
+    for _ in range(100):
+        ok_response = client.get("/check", params={"brand": "Google"})
+        assert ok_response.status_code == 200
+
+    blocked_response = client.get("/check", params={"brand": "Google"})
+    assert blocked_response.status_code == 429
+
+
+def test_rate_limit_uses_forwarded_for_header(client: TestClient) -> None:
+    """Ensure X-Forwarded-For is honoured when computing the rate-limit key."""
+    headers = {"x-forwarded-for": "203.0.113.5"}
+    for _ in range(100):
+        ok_response = client.get("/check", params={"brand": "Google"}, headers=headers)
+        assert ok_response.status_code == 200
+
+    blocked_response = client.get(
+        "/check", params={"brand": "Google"}, headers=headers
+    )
+    assert blocked_response.status_code == 429
 
 
 def test_rate_limiter_configured(client: TestClient) -> None:

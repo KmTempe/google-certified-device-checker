@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -9,16 +10,44 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+from slowapi.middleware import SlowAPIMiddleware
 
 APP_TITLE = "Google Certified Device Checker"
 CSV_FILENAME = "supported_devices.csv"
 DEFAULT_LIMIT = 50
+
+
+def _load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+
+    try:
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            if "=" not in line:
+                continue
+
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key:
+                continue
+
+            parsed = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, parsed)
+    except OSError:
+        # Ignore file access issues to avoid failing app startup when env file is missing.
+        return
+
+
+_load_env_file(Path(__file__).resolve().parent / ".env.local")
 
 
 def _read_bool_env(name: str, default: bool = False) -> bool:
@@ -37,6 +66,25 @@ def _read_float_env(name: str, default: float = 0.0) -> float:
         return float(raw_value)
     except ValueError:
         return default
+
+
+RATE_LIMIT_LOG_ENABLED = _read_bool_env("RATE_LIMIT_LOG_ENABLED", default=False)
+
+_rate_limit_logger = logging.getLogger("rate_limit")
+
+if RATE_LIMIT_LOG_ENABLED:
+    LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+    LOG_DIR.mkdir(exist_ok=True)
+    RATE_LIMIT_LOG = LOG_DIR / "rate_limited_clients.log"
+
+    if not _rate_limit_logger.handlers:
+        _rate_limit_logger.setLevel(logging.INFO)
+        handler = logging.FileHandler(RATE_LIMIT_LOG)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+        _rate_limit_logger.addHandler(handler)
+else:
+    if not _rate_limit_logger.handlers:
+        _rate_limit_logger.addHandler(logging.NullHandler())
 
 
 SIMULATE_COLD_START = _read_bool_env("SIMULATE_COLD_START", default=False)
@@ -212,11 +260,48 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 # Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
+
+
+def _client_identifier(request: Request) -> str:
+    """Return a stable client identifier taking reverse proxies into account."""
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        for part in forwarded_for.split(","):
+            ip = part.strip()
+            if ip:
+                return ip
+
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+
+    client = request.client
+    if client and client.host:
+        return client.host
+
+    return "unknown"
+
+
+limiter = Limiter(key_func=_client_identifier, headers_enabled=True)
 
 app = FastAPI(title=APP_TITLE, lifespan=lifespan)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+app.add_middleware(SlowAPIMiddleware)
+
+
+async def _log_rate_limit_exceeded(request: Request, exc: RateLimitExceeded):
+    client_id = _client_identifier(request)
+    route = request.url.path
+    if RATE_LIMIT_LOG_ENABLED:
+        _rate_limit_logger.info("blocked client=%s route=%s", client_id, route)
+    return _rate_limit_exceeded_handler(request, exc)
+
+
+app.add_exception_handler(RateLimitExceeded, _log_rate_limit_exceeded)  # type: ignore[arg-type]
 
 app.add_middleware(
     CORSMiddleware,
@@ -244,6 +329,7 @@ async def read_health() -> dict[str, str]:
 @limiter.limit("100/hour")
 async def check_device(
     request: Request,
+    response: Response,
     brand: Optional[str] = Query(
         None, description="Filter by retail brand (case-insensitive substring match)."
     ),

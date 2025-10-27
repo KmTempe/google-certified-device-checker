@@ -1,7 +1,8 @@
 // Rate Limiter Test Script for Chrome DevTools Console
 // Tests the API rate limit (100 requests/hour per IP)
 
-const API_URL = 'https://google-certified-device-checker-api.onrender.com/check';
+const API_URL = "" ; /* 'https://api.example.com/check'; */  
+const localAPIUrl = 'http://localhost:8000/check';
 
 async function testRateLimiter(numRequests = 105) {
   console.log(`🚀 Starting rate limiter test with ${numRequests} requests...`);
@@ -17,11 +18,15 @@ async function testRateLimiter(numRequests = 105) {
 
   for (let i = 1; i <= numRequests; i++) {
     try {
-      const response = await fetch(`${API_URL}?model=Pixel`, {
+      const cacheBuster = `${Date.now()}-${i}`;
+      const response = await fetch(`${localAPIUrl}?model=Pixel&_=${cacheBuster}`, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json'
-        }
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
       });
 
       const status = response.status;
