@@ -1,6 +1,0 @@
-2025-10-27 20:40:10,982 blocked client=testclient route=/check
-2025-10-27 20:40:11,339 blocked client=203.0.113.5 route=/check
-2025-10-27 20:42:38,387 blocked client=127.0.0.1 route=/check
-2025-10-27 20:45:24,376 blocked client=127.0.0.1 route=/check
-2025-10-27 20:48:17,836 blocked client=testclient route=/check
-2025-10-27 20:48:18,193 blocked client=203.0.113.5 route=/check
