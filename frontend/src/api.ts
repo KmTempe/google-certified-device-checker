@@ -20,6 +20,7 @@ const apiBaseUrl = rawBaseUrl ? rawBaseUrl.replace(/\/$/, "") : "/api";
 
 const DEVICE_CACHE_PREFIX = "device_cache_v1_";
 const DEVICE_CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
+const SERVICE_WARMUP_TIMEOUT_MS = 15_000; // Give the backend a generous head start before surfacing warmup UI
 
 export class ServiceWarmingError extends Error {
   retryAfterSeconds: number;
@@ -52,6 +53,13 @@ interface NormalizedLookupParams {
 interface DeviceCacheEntry {
   data: DeviceLookupResponse;
   timestamp: number;
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
 }
 
 function isBrowser(): boolean {
@@ -162,11 +170,33 @@ export async function lookupDevices(params: LookupParams) {
     page: normalized.page,
   });
   const url = `${apiBaseUrl}/check?${query}`;
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-    },
-  });
+  const response = await (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, SERVICE_WARMUP_TIMEOUT_MS);
+
+    try {
+      return await fetch(url, {
+        headers: {
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (isAbortError(error)) {
+        // Surface the warmup UI when the backend is still cold and does not answer quickly.
+        throw new ServiceWarmingError(
+          "Service is taking longer than expected to respond. Trying again shortly.",
+          Math.ceil(SERVICE_WARMUP_TIMEOUT_MS / 1000)
+        );
+      }
+
+      throw error instanceof Error ? error : new Error("Request failed");
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  })();
 
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";
