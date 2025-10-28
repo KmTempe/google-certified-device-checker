@@ -13,6 +13,11 @@ export interface DeviceLookupResponse {
   results: DeviceRecord[];
 }
 
+export interface HealthStatus {
+  status: string;
+  version?: string;
+}
+
 export const DEFAULT_LIMIT = 25;
 
 const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "") as string;
@@ -239,4 +244,21 @@ export async function lookupDevices(params: LookupParams) {
   const data: DeviceLookupResponse = await response.json();
   setCachedLookupResult(params, data);
   return data;
+}
+
+export async function fetchApiHealth(): Promise<HealthStatus> {
+  const url = `${apiBaseUrl}/health`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Health check failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as HealthStatus;
+  return payload;
 }

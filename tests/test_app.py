@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import main
+from app.version import API_VERSION
 
 
 @pytest.fixture(autouse=True)
@@ -48,14 +49,14 @@ def client() -> Iterator[TestClient]:
 def test_health_endpoint(client: TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "version": API_VERSION}
 
 
 def test_health_reports_initializing_when_cold_start(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
     monkeypatch.setattr(main, "_cold_start_pending", True)
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "initializing"}
+    assert response.json() == {"status": "initializing", "version": API_VERSION}
 
 
 def test_check_requires_filter(client: TestClient) -> None:
@@ -166,7 +167,7 @@ def test_health_endpoint_always_accessible(client: TestClient) -> None:
     for _ in range(10):
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        assert response.json() == {"status": "ok", "version": API_VERSION}
 
 
 def test_invalid_page_number(client: TestClient) -> None:

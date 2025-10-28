@@ -17,6 +17,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from .version import API_VERSION
+
 APP_TITLE = "Google Certified Device Checker"
 CSV_FILENAME = "supported_devices.csv"
 DEFAULT_LIMIT = 50
@@ -318,7 +320,7 @@ app.add_middleware(
 @app.get("/health", tags=["health"])  # pragma: no cover - trivial
 async def read_health() -> dict[str, str]:
     status = "initializing" if _cold_start_pending else "ok"
-    return {"status": status}
+    return {"status": status, "version": API_VERSION}
 
 
 @app.get(

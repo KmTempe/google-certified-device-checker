@@ -5,6 +5,7 @@ import {
   type DeviceLookupResponse,
   ServiceWarmingError,
   getCachedLookupResult,
+  fetchApiHealth,
 } from "./api";
 import {
   generateCacheKey,
@@ -12,6 +13,7 @@ import {
   setCachedData,
   clearOldCache,
 } from "./cache";
+import { APP_VERSION } from "./version";
 
 interface FormState {
   brand: string;
@@ -45,6 +47,7 @@ function App() {
   const [warmupMessage, setWarmupMessage] = useState<string | null>(null);
   const [cacheStatusMessage, setCacheStatusMessage] = useState<string | null>(null);
   const [isUsingCachedResults, setIsUsingCachedResults] = useState(false);
+  const [apiVersion, setApiVersion] = useState<string | null>(null);
 
   function stopWarmupTimers() {
     if (warmupRetryTimer.current !== null) {
@@ -68,6 +71,26 @@ function App() {
   useEffect(() => {
     return () => {
       stopWarmupTimers();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const health = await fetchApiHealth();
+        const version = health.version?.trim();
+        if (!cancelled && version) {
+          setApiVersion(version);
+        }
+      } catch {
+        // Ignore health fetch failures; UI can operate without API version info.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -521,6 +544,10 @@ function App() {
           Need help? Email {" "}
           <a href="mailto:level7feeders@gmail.com">level7feeders@gmail.com</a>
           .
+        </span>
+        <span>
+          Version {APP_VERSION}
+          {apiVersion ? ` • API ${apiVersion}` : ""}
         </span>
       </footer>
     </div>
