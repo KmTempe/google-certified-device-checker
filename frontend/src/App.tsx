@@ -33,7 +33,45 @@ const initialFormState: FormState = {
 
 const WARMUP_MIN_DELAY_SECONDS = 20;
 
+type ThemeMode = "light" | "dark";
+
+const THEME_STORAGE_KEY = "gcdc-theme-preference";
+
+function readStoredTheme(): ThemeMode | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch {
+    // Ignore storage failures; theme preference persistence is optional.
+  }
+
+  return null;
+}
+
+function readSystemTheme(): ThemeMode {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return "light";
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function App() {
+  const [themeState, setThemeState] = useState<{ theme: ThemeMode; isSystem: boolean }>(() => {
+    const storedTheme = readStoredTheme();
+    if (storedTheme) {
+      return { theme: storedTheme, isSystem: false };
+    }
+
+    return { theme: readSystemTheme(), isSystem: true };
+  });
+  const { theme, isSystem } = themeState;
   const [form, setForm] = useState<FormState>(initialFormState);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +86,74 @@ function App() {
   const [cacheStatusMessage, setCacheStatusMessage] = useState<string | null>(null);
   const [isUsingCachedResults, setIsUsingCachedResults] = useState(false);
   const [apiVersion, setApiVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.body.dataset.theme = theme;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      if (isSystem) {
+        window.localStorage.removeItem(THEME_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+      }
+    } catch {
+      // Swallow storage errors so theme toggling still works.
+    }
+  }, [theme, isSystem]);
+
+  useEffect(() => {
+    if (!isSystem || typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+    setThemeState((prev) => {
+      if (!prev.isSystem) {
+        return prev;
+      }
+
+      const nextTheme = mediaQuery.matches ? "dark" : "light";
+      if (prev.theme === nextTheme) {
+        return prev;
+      }
+
+      return { theme: nextTheme, isSystem: true };
+    });
+
+    const listener = (event: MediaQueryListEvent) => {
+      setThemeState((prev) => {
+        if (!prev.isSystem) {
+          return prev;
+        }
+
+        const nextTheme = event.matches ? "dark" : "light";
+        if (prev.theme === nextTheme) {
+          return prev;
+        }
+
+        return { theme: nextTheme, isSystem: true };
+      });
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", listener);
+      return () => {
+        mediaQuery.removeEventListener("change", listener);
+      };
+    }
+
+    mediaQuery.addListener(listener);
+    return () => {
+      mediaQuery.removeListener(listener);
+    };
+  }, [isSystem]);
 
   function stopWarmupTimers() {
     if (warmupRetryTimer.current !== null) {
@@ -93,6 +199,17 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  function handleToggleTheme() {
+    setThemeState((prev) => ({
+      theme: prev.theme === "dark" ? "light" : "dark",
+      isSystem: false,
+    }));
+  }
+
+  function handleUseSystemTheme() {
+    setThemeState({ theme: readSystemTheme(), isSystem: true });
+  }
 
   const canSubmit = useMemo(() => {
     return (
@@ -320,6 +437,26 @@ function App() {
 
   return (
     <div className="layout">
+      <div className="toolbar" role="region" aria-label="Theme controls">
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={handleToggleTheme}
+          aria-pressed={theme === "dark"}
+          title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        >
+          {theme === "dark" ? "Use light theme" : "Use dark theme"}
+        </button>
+        {!isSystem ? (
+          <button
+            type="button"
+            className="theme-reset"
+            onClick={handleUseSystemTheme}
+          >
+            Use system theme
+          </button>
+        ) : null}
+      </div>
       <header className="hero">
         <h1>Google Certified Device Checker</h1>
         <p>
