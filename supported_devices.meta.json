@@ -1,7 +1,8 @@
 {
-  "etag": "\"54e911418818538ac3c03401a499f822\"",
-  "fetched_at": "2025-10-24T20:29:01.725339+00:00",
-  "generated_at": "2025-10-24T20:29:00.878463+00:00",
-  "last_modified": "Sun, 19 Oct 2025 12:06:52 GMT",
-  "sha256": "fa8c85a99b184793c031fb0cc5e943800490ad5da3b92b8012ebbaa2da4c321d"
+  "etag": "\"e942104997ac5d1081d4ca92873e81e8\"",
+  "fetched_at": "2025-11-19T08:27:50.925638+00:00",
+  "last_modified": "Tue, 18 Nov 2025 12:13:16 GMT",
+  "sha256": "47f5f4730ea775bfe1419e8902db9192717eb4c6e1660f7e516afd3089543bcb",
+  "size_bytes": 4449528,
+  "source_url": "https://storage.googleapis.com/play_public/supported_devices.csv"
 }
