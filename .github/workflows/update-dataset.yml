@@ -17,6 +17,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          
+      - name: Pull latest changes before push
+        run: git pull origin dataset-refresh --rebase
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -31,8 +34,6 @@ jobs:
       - name: Download latest dataset
         run: python scripts/refresh_dataset.py
 
-      - name: Pull latest changes before push
-        run: git pull origin dataset-refresh --rebase
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
