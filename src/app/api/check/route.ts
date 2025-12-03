@@ -47,7 +47,8 @@ export async function GET(request: Request) {
             return (
                 (item['Model'] && item['Model'].toLowerCase().includes(searchStr)) ||
                 (item['Device'] && item['Device'].toLowerCase().includes(searchStr)) ||
-                (item['Marketing Name'] && item['Marketing Name'].toLowerCase().includes(searchStr))
+                (item['Marketing Name'] && item['Marketing Name'].toLowerCase().includes(searchStr)) ||
+                (item['Retail Branding'] && item['Retail Branding'].toLowerCase().includes(searchStr))
             );
         });
 

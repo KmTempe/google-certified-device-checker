@@ -148,7 +148,8 @@ export const cacheManager = {
         const results = devices.filter(item =>
             (item['Model'] && item['Model'].toLowerCase().includes(searchStr)) ||
             (item['Device'] && item['Device'].toLowerCase().includes(searchStr)) ||
-            (item['Marketing Name'] && item['Marketing Name'].toLowerCase().includes(searchStr))
+            (item['Marketing Name'] && item['Marketing Name'].toLowerCase().includes(searchStr)) ||
+            (item['Retail Branding'] && item['Retail Branding'].toLowerCase().includes(searchStr))
         );
 
         return results.length > 0 ? results : null;
