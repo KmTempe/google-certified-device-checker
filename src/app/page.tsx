@@ -3,15 +3,9 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Pagination } from "@/components/Pagination";
-import { Search, Smartphone, CheckCircle2, AlertCircle, Info, Home as HomeIcon, Github, ExternalLink, X } from "lucide-react";
+import { Search, Smartphone, CheckCircle2, AlertCircle, Info, Home as HomeIcon, Github, ExternalLink, X, Database, RefreshCw } from "lucide-react";
 import pkg from "../../package.json";
-
-interface DeviceData {
-  "Retail Branding": string;
-  "Marketing Name": string;
-  "Device": string;
-  "Model": string;
-}
+import { cacheManager, DeviceData } from "@/utils/cacheManager";
 
 export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -19,6 +13,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [dataSource, setDataSource] = useState<'API' | 'Session Cache' | 'Local Cache' | null>(null);
   const infoRef = useRef<HTMLDivElement>(null);
 
   // Pagination state
@@ -36,15 +31,28 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearch = async (forceRefresh = false) => {
     if (!searchTerm) return;
 
     setLoading(true);
     setError(null);
     setResults(null);
+    setDataSource(null);
     setCurrentPage(1); // Reset to first page on new search
 
     try {
+      // 1. Check Cache (if not forced)
+      if (!forceRefresh) {
+        const cached = cacheManager.get(searchTerm);
+        if (cached) {
+          setResults(cached.data);
+          setDataSource(cached.source);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Fetch from API
       const res = await fetch(`/api/check?device=${encodeURIComponent(searchTerm)}`);
       const data = await res.json();
 
@@ -52,6 +60,9 @@ export default function Home() {
         setError(data.error);
       } else {
         setResults(data.results);
+        setDataSource('API');
+        // 3. Save to Cache
+        cacheManager.set(searchTerm, data.results);
       }
     } catch (err) {
       setError("Failed to fetch device data.");
@@ -148,10 +159,10 @@ export default function Home() {
               placeholder="Search by Device Name, Model, or Brand..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch(false)}
             />
             <button
-              onClick={handleSearch}
+              onClick={() => handleSearch(false)}
               className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
               disabled={loading}
             >
@@ -171,7 +182,7 @@ export default function Home() {
         {/* Results Section */}
         {results && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between px-2">
+            <div className="flex items-center justify-between px-2 flex-wrap gap-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {results.length > 0 ? (
                   <>
@@ -182,6 +193,30 @@ export default function Home() {
                   <span>No devices found</span>
                 )}
               </div>
+
+              {/* Data Source Indicator */}
+              {dataSource && (
+                <div className="flex items-center gap-3 text-xs">
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${dataSource === 'API'
+                      ? 'bg-blue-500/10 border-blue-500/20 text-blue-500'
+                      : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                    }`}>
+                    <Database className="w-3 h-3" />
+                    <span className="font-medium">Source: {dataSource}</span>
+                  </div>
+
+                  {dataSource !== 'API' && (
+                    <button
+                      onClick={() => handleSearch(true)}
+                      className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"
+                      title="Force refresh from server"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Refresh Data</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {results.length === 0 ? (
