@@ -28,7 +28,7 @@ export async function GET(request: Request) {
             data = cachedData;
         } else {
             console.log("Loading device list from file...");
-            const filePath = path.join(process.cwd(), 'public', 'supported_devices.csv');
+            const filePath = path.join(process.cwd(), 'data', 'supported_devices.csv');
             const csvText = fs.readFileSync(filePath, 'utf-8');
 
             // Parse CSV
