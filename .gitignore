@@ -1,46 +1,41 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.coverage
-coverage.xml
-htmlcov/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Virtual environments
-.venv/
-env/
-venv/
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
-# IDE
-.vscode/
-.idea/
+# testing
+/coverage
 
-# Environment variables
-.env
-.env.local
-.env.prod
+# next.js
+/.next/
+/out/
 
-# Node.js / Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/.turbo/
-frontend/.env.local
-frontend/.env.prod
+# production
+/build
 
-# OS artifacts
+# misc
 .DS_Store
-Thumbs.db
+*.pem
 
-# Logs
-logs/
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Docs
-README.md
+# env files (can opt-in for committing if needed)
+.env*
 
-# Project-specific ignores
-KNOWN_ISSUES.md
-test-rate-limiter.js
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
