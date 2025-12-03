@@ -77,7 +77,7 @@ async function main() {
 
         if (etag && metadata.etag === etag && !force) {
             console.log('Dataset already up-to-date (etag match).');
-            return;
+            process.exit(0);
         }
 
         console.log('Downloading dataset...');
@@ -91,7 +91,7 @@ async function main() {
             metadata.last_modified = lastModified;
             metadata.fetched_at = new Date().toISOString();
             saveMetadata(metadata);
-            return;
+            process.exit(0);
         }
 
         // Save new data
@@ -109,6 +109,7 @@ async function main() {
         saveMetadata(newMetadata);
 
         console.log(`Dataset updated. New sha256: ${sha256}`);
+        process.exit(0);
 
     } catch (error) {
         console.error('Error updating dataset:', error);
