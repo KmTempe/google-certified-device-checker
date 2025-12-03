@@ -81,8 +81,18 @@ async function main() {
         }
 
         console.log('Downloading dataset...');
-        const data = await downloadFile(CSV_URL);
-        const sha256 = computeSHA256(data);
+        const buffer = await downloadFile(CSV_URL);
+
+        // Convert to UTF-8 if necessary
+        let content = '';
+        if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+            console.log('Detected UTF-16LE encoding, converting to UTF-8...');
+            content = buffer.toString('utf16le');
+        } else {
+            content = buffer.toString('utf8');
+        }
+
+        const sha256 = computeSHA256(Buffer.from(content)); // Compute hash on UTF-8 content
 
         if (metadata.sha256 === sha256 && !force) {
             console.log('Dataset already up-to-date (hash match).');
@@ -94,8 +104,8 @@ async function main() {
             process.exit(0);
         }
 
-        // Save new data
-        fs.writeFileSync(CSV_PATH, data);
+        // Save new data as UTF-8
+        fs.writeFileSync(CSV_PATH, content, 'utf-8');
 
         // Save new metadata
         const newMetadata = {
@@ -104,7 +114,7 @@ async function main() {
             last_modified: lastModified,
             sha256: sha256,
             fetched_at: new Date().toISOString(),
-            size_bytes: data.length
+            size_bytes: Buffer.byteLength(content, 'utf8')
         };
         saveMetadata(newMetadata);
 
