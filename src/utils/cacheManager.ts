@@ -100,5 +100,57 @@ export const cacheManager = {
         } catch (e) {
             console.error("Failed to clear cache", e);
         }
+    },
+
+    getAllCachedDevices: (): DeviceData[] => {
+        const allDevices = new Map<string, DeviceData>();
+        const now = Date.now();
+
+        const processStorage = (storage: Storage) => {
+            Object.keys(storage).forEach(key => {
+                if (key.startsWith('device_search_')) {
+                    try {
+                        const item = storage.getItem(key);
+                        if (item) {
+                            const entry: CacheEntry = JSON.parse(item);
+                            if (now - entry.timestamp < CACHE_LIFETIME) {
+                                entry.data.forEach(device => {
+                                    // Create a unique key for deduplication
+                                    const uniqueKey = `${device.Device}|${device.Model}|${device['Marketing Name']}`;
+                                    if (!allDevices.has(uniqueKey)) {
+                                        allDevices.set(uniqueKey, device);
+                                    }
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Failed to parse cache entry", e);
+                    }
+                }
+            });
+        };
+
+        try {
+            processStorage(localStorage);
+            processStorage(sessionStorage);
+        } catch (e) {
+            console.error("Error accessing storage for smart search", e);
+        }
+
+        return Array.from(allDevices.values());
+    },
+
+    search: (query: string): DeviceData[] | null => {
+        const devices = cacheManager.getAllCachedDevices();
+        if (devices.length === 0) return null;
+
+        const searchStr = query.toLowerCase();
+        const results = devices.filter(item =>
+            (item['Model'] && item['Model'].toLowerCase().includes(searchStr)) ||
+            (item['Device'] && item['Device'].toLowerCase().includes(searchStr)) ||
+            (item['Marketing Name'] && item['Marketing Name'].toLowerCase().includes(searchStr))
+        );
+
+        return results.length > 0 ? results : null;
     }
 };

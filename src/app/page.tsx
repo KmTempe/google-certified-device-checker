@@ -13,7 +13,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
-  const [dataSource, setDataSource] = useState<'API' | 'Session Cache' | 'Local Cache' | null>(null);
+  const [dataSource, setDataSource] = useState<'API' | 'Session Cache' | 'Local Cache' | 'Smart Cache' | null>(null);
   const infoRef = useRef<HTMLDivElement>(null);
 
   // Pagination state
@@ -43,10 +43,20 @@ export default function Home() {
     try {
       // 1. Check Cache (if not forced)
       if (!forceRefresh) {
+        // Try exact match first
         const cached = cacheManager.get(searchTerm);
         if (cached) {
           setResults(cached.data);
           setDataSource(cached.source);
+          setLoading(false);
+          return;
+        }
+
+        // Try smart search (derived from other cache entries)
+        const smartResults = cacheManager.search(searchTerm);
+        if (smartResults) {
+          setResults(smartResults);
+          setDataSource('Smart Cache'); // New source type
           setLoading(false);
           return;
         }
@@ -198,8 +208,8 @@ export default function Home() {
               {dataSource && (
                 <div className="flex items-center gap-3 text-xs">
                   <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${dataSource === 'API'
-                      ? 'bg-blue-500/10 border-blue-500/20 text-blue-500'
-                      : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                    ? 'bg-blue-500/10 border-blue-500/20 text-blue-500'
+                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
                     }`}>
                     <Database className="w-3 h-3" />
                     <span className="font-medium">Source: {dataSource}</span>
