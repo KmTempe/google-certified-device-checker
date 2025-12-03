@@ -95,12 +95,12 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300">
       <div className="max-w-6xl mx-auto p-4 md:p-8">
         {/* Header */}
-        <header className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
+        <header className="flex flex-col md:flex-row justify-between items-center mb-8 md:mb-12 gap-6">
           <div className="text-center md:text-left">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-primary">
+            <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-primary">
               Google Certified Device Checker
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground mt-2 text-sm md:text-base">
               Verify Google Play Protect certification status
             </p>
           </div>
@@ -124,7 +124,7 @@ export default function Home() {
               </button>
 
               {showInfo && (
-                <div className="fixed right-8 top-8 w-72 bg-card border border-border rounded-xl shadow-xl z-50 p-4 animate-in fade-in zoom-in-95 duration-200">
+                <div className="fixed right-4 top-16 md:right-8 md:top-8 w-72 bg-card border border-border rounded-xl shadow-xl z-50 p-4 animate-in fade-in zoom-in-95 duration-200">
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="font-semibold text-foreground">About Project</h3>
                     <button onClick={() => setShowInfo(false)} className="text-muted-foreground hover:text-foreground">
@@ -161,19 +161,21 @@ export default function Home() {
 
         {/* Search Section */}
         <div className="bg-card border border-border rounded-2xl p-2 shadow-sm mb-8 max-w-2xl mx-auto md:mx-0">
-          <div className="flex items-center gap-2 px-2">
-            <Search className="w-5 h-5 text-muted-foreground" />
-            <input
-              type="text"
-              className="flex-1 bg-transparent border-none p-3 focus:outline-none text-foreground placeholder-muted-foreground"
-              placeholder="Search by Device Name, Model, or Brand..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch(false)}
-            />
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 px-2">
+            <div className="flex items-center flex-1 gap-2 border-b md:border-none border-border pb-2 md:pb-0">
+              <Search className="w-5 h-5 text-muted-foreground shrink-0" />
+              <input
+                type="text"
+                className="flex-1 bg-transparent border-none p-2 md:p-3 focus:outline-none text-foreground placeholder-muted-foreground text-base"
+                placeholder="Search Device, Model..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch(false)}
+              />
+            </div>
             <button
               onClick={() => handleSearch(false)}
-              className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+              className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none w-full md:w-auto"
               disabled={loading}
             >
               {loading ? 'Searching...' : 'Check Device'}
@@ -192,7 +194,7 @@ export default function Home() {
         {/* Results Section */}
         {results && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between px-2 flex-wrap gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between px-2 gap-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {results.length > 0 ? (
                   <>
@@ -206,7 +208,7 @@ export default function Home() {
 
               {/* Data Source Indicator */}
               {dataSource && (
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3 text-xs">
                   <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${dataSource === 'API'
                     ? 'bg-blue-500/10 border-blue-500/20 text-blue-500'
                     : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
@@ -241,19 +243,30 @@ export default function Home() {
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-muted/50 border-b border-border">
-                        <th className="p-4 font-medium text-muted-foreground">Marketing Name</th>
-                        <th className="p-4 font-medium text-muted-foreground">Device Code</th>
-                        <th className="p-4 font-medium text-muted-foreground">Model</th>
-                        <th className="p-4 font-medium text-muted-foreground">Brand</th>
+                        <th className="p-3 md:p-4 font-medium text-muted-foreground">Marketing Name</th>
+                        <th className="p-3 md:p-4 font-medium text-muted-foreground hidden md:table-cell">Device Code</th>
+                        <th className="p-3 md:p-4 font-medium text-muted-foreground">Model</th>
+                        <th className="p-3 md:p-4 font-medium text-muted-foreground hidden md:table-cell">Brand</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {paginatedResults.map((device, index) => (
                         <tr key={index} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-4 font-medium text-foreground">{device['Marketing Name'] || <span className="text-muted-foreground italic">N/A</span>}</td>
-                          <td className="p-4 font-mono text-xs text-muted-foreground">{device['Device']}</td>
-                          <td className="p-4 font-mono text-xs text-primary bg-primary/5 rounded w-fit px-2 py-0.5">{device['Model']}</td>
-                          <td className="p-4 text-muted-foreground">{device['Retail Branding']}</td>
+                          <td className="p-3 md:p-4 font-medium text-foreground break-words max-w-[150px] md:max-w-none">
+                            {device['Marketing Name'] || <span className="text-muted-foreground italic">N/A</span>}
+                            {/* Mobile-only details */}
+                            <div className="md:hidden mt-1 space-y-0.5">
+                              <div className="text-xs text-muted-foreground">{device['Retail Branding']}</div>
+                              <div className="text-[10px] font-mono text-muted-foreground/70">{device['Device']}</div>
+                            </div>
+                          </td>
+                          <td className="p-3 md:p-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{device['Device']}</td>
+                          <td className="p-3 md:p-4 align-top md:align-middle">
+                            <span className="font-mono text-xs text-primary bg-primary/5 rounded px-2 py-0.5 inline-block whitespace-nowrap">
+                              {device['Model']}
+                            </span>
+                          </td>
+                          <td className="p-3 md:p-4 text-muted-foreground hidden md:table-cell">{device['Retail Branding']}</td>
                         </tr>
                       ))}
                     </tbody>
