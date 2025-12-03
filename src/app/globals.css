@@ -1,26 +1,110 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light Mode - Adapted to use the Teal identity */
+  --background: 210 40% 98%;
+  --foreground: 216 65% 11%;
+  /* Navy text #0a192f */
+
+  --card: 0 0% 100%;
+  --card-foreground: 216 65% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 216 65% 11%;
+
+  --primary: 168 81% 44%;
+  /* Teal Dark #14cba8 */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 168 81% 44%;
+
+  --radius: 0.25rem;
+  /* 4px to match user's borderRadius: 4 */
+}
+
+.dark {
+  /* Dark Mode - Exact match to user's palette */
+  --background: 216 65% 11%;
+  /* #0a192f */
+  --foreground: 227 56% 88%;
+  /* #ccd6f6 */
+
+  --card: 218 57% 16%;
+  /* #112240 */
+  --card-foreground: 227 56% 88%;
+  /* #ccd6f6 */
+
+  --popover: 218 57% 16%;
+  /* #112240 */
+  --popover-foreground: 227 56% 88%;
+
+  --primary: 166 100% 70%;
+  /* #64ffda rgb(100, 255, 218) */
+  --primary-foreground: 216 65% 11%;
+  /* #0a192f */
+
+  --secondary: 218 57% 16%;
+  --secondary-foreground: 227 56% 88%;
+
+  --muted: 218 57% 16%;
+  --muted-foreground: 225 21% 61%;
+  /* #8892b0 rgb(136, 146, 176) */
+
+  --accent: 218 57% 16%;
+  --accent-foreground: 166 100% 70%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 166 100% 70%;
+  /* Using primary for border to match outlined button style, or subtle */
+  /* User had divider: rgba(100, 255, 218, 0.1) -> 166 100% 70% with opacity handled in utility */
+  --input: 218 57% 25%;
+  /* Slightly lighter than card for inputs */
+  --ring: 166 100% 70%;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-background text-foreground antialiased;
 }
