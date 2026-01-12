@@ -12,6 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // Vercel build output (generated):
+    ".vercel/**",
+
+    // Not part of the Next.js app (kept for reference only):
+    "legacy/**",
+
+    // Repo-cleaner artifacts:
+    ".bfg/**",
+    "..bfg-report/**",
   ]),
 ]);
 

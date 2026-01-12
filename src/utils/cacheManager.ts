@@ -52,7 +52,7 @@ export const cacheManager = {
                             localStorage.setItem(key, JSON.stringify(entry));
                             sessionStorage.removeItem(key); // Remove from session once promoted
                             return { data: entry.data, source: 'Local Cache' }; // Return as local now
-                        } catch (e) {
+                        } catch {
                             // If local storage fails (e.g. full), keep in session
                             sessionStorage.setItem(key, JSON.stringify(entry));
                             return { data: entry.data, source: 'Session Cache' };
