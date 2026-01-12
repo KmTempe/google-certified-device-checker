@@ -45,3 +45,8 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# repo-cleaning artifacts / sensitive docs
+/.bfg/
+/..bfg-report/
+/Migration Plan Google Certified Device Checker to Next.md
