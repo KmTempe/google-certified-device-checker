@@ -1,8 +1,8 @@
 {
   "source_url": "https://storage.googleapis.com/play_public/supported_devices.csv",
-  "etag": "\"e2a2dbf3246ed4b93b1ea893bb99ef43\"",
-  "last_modified": "Wed, 01 Jul 2026 12:06:22 GMT",
-  "sha256": "47a47edb5c6056997a382aa69bfb0625622fcd69095854f6e20dabd43c80e999",
-  "fetched_at": "2026-07-02T09:07:37.034Z",
-  "size_bytes": 2339565
+  "etag": "\"c6054d88467d0c17ffd3494383f348c8\"",
+  "last_modified": "Thu, 02 Jul 2026 12:07:13 GMT",
+  "sha256": "e20d0010a8d830dfec2582bd3aa4c61a0a442918530ad8b86e5a03f96ee600be",
+  "fetched_at": "2026-07-03T10:34:41.347Z",
+  "size_bytes": 2339762
 }
