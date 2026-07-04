@@ -24,7 +24,7 @@ jobs:
         run: node scripts/update-dataset.mjs
 
       - name: Commit changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: update supported devices dataset"
           file_pattern: 'data/*'
